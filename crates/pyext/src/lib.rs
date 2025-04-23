@@ -58,6 +58,7 @@ fn _accelerate(m: &Bound<PyModule>) -> PyResult<()> {
     add_submodule(m, ::qiskit_accelerate::sabre::sabre, "sabre")?;
     add_submodule(m, ::qiskit_accelerate::sampled_exp_val::sampled_exp_val, "sampled_exp_val")?;
     add_submodule(m, ::qiskit_accelerate::sparse_observable::sparse_observable, "sparse_observable")?;
+    add_submodule(m, ::qiskit_accelerate::noise_map::noise_map, "noise_map")?;
     add_submodule(m, ::qiskit_accelerate::sparse_pauli_op::sparse_pauli_op, "sparse_pauli_op")?;
     add_submodule(m, ::qiskit_accelerate::split_2q_unitaries::split_2q_unitaries_mod, "split_2q_unitaries")?;
     add_submodule(m, ::qiskit_accelerate::star_prerouting::star_prerouting, "star_prerouting")?;

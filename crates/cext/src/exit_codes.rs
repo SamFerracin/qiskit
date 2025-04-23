@@ -11,6 +11,7 @@
 // that they have been altered from the originals.
 
 use qiskit_accelerate::sparse_observable::ArithmeticError;
+use qiskit_accelerate::noise_map::ArithmeticErrorSam;
 use thiserror::Error;
 
 /// Errors related to C input.
@@ -39,8 +40,18 @@ pub enum ExitCode {
     IndexError = 103,
     /// Error related to arithmetic operations or similar.
     ArithmeticError = 200,
+    /// Error related to arithmetic operations or similar.
+    ArithmeticErrorSam = 220,
     /// Mismatching number of qubits.
     MismatchedQubits = 201,
+}
+
+impl From<ArithmeticErrorSam> for ExitCode {
+    fn from(value: ArithmeticErrorSam) -> Self {
+        match value {
+            ArithmeticErrorSam::MismatchedQubits { left: _, right: _ } => ExitCode::MismatchedQubits,
+        }
+    }
 }
 
 impl From<ArithmeticError> for ExitCode {

@@ -39,5 +39,6 @@ prefix_with_name = true
 "SparseObservable" = "QkObs"
 "CSparseTerm" = "QkObsTerm"
 "BitTerm" = "QkBitTerm"
+"BitTermSam" = "QkBitTermSam"
 "Complex64" = "QkComplex64"
 "ExitCode" = "QkExitCode"

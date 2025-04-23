@@ -12,3 +12,4 @@
 
 pub mod exit_codes;
 pub mod sparse_observable;
+pub mod noise_map;

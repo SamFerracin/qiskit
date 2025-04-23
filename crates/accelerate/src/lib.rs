@@ -37,6 +37,7 @@ pub mod high_level_synthesis;
 pub mod inverse_cancellation;
 pub mod isometry;
 pub mod nlayout;
+pub mod noise_map;
 pub mod optimize_1q_gates;
 pub mod pauli_exp_val;
 pub mod remove_diagonal_gates_before_measure;

@@ -10,8 +10,9 @@
 // copyright notice, and modified files need to carry a notice indicating
 // that they have been altered from the originals.
 
-mod pointers;
+//! Quantum-information and linear-algebra related functionality, typically used as drivers for
+//! numeric compiler routines.
 
-pub mod circuit;
-pub mod exit_codes;
-pub mod sparse_observable;
+mod versor_u2;
+
+pub use self::versor_u2::{VersorSU2, VersorU2, VersorU2Error};

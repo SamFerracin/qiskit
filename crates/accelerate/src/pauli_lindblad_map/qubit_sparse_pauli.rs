@@ -193,6 +193,8 @@ pub enum CoherenceError {
     IndexMapTooSmall,
     #[error("cannot shrink the qubit count in a QubitSparsePauliList from {current} to {target}")]
     NotEnoughQubits { current: usize, target: usize },
+    #[error("cannot delete qubit {index} from {num_qubits}-qubits PauliLindbladMap")]
+    BadDeleteIndex { index: u32, num_qubits: u32 },
 }
 
 /// An error related to processing of a string label (both dense and sparse).

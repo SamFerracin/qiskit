@@ -10,6 +10,9 @@
 // copyright notice, and modified files need to carry a notice indicating
 // that they have been altered from the originals.
 
+use hashbrown::{HashMap, HashSet};
+use std::collections::btree_map;
+
 use numpy::{PyArray1, PyArrayLike1, PyArrayMethods};
 use pyo3::{
     exceptions::{PyTypeError, PyValueError},
@@ -284,6 +287,57 @@ impl PauliLindbladMap {
             paulis: &self.qubit_sparse_pauli_list.paulis[start..end],
             indices: &self.qubit_sparse_pauli_list.indices[start..end],
         }
+    }
+
+    pub fn drop_paulis(&self, indices: Vec<u32>) -> Result<Self, CoherenceError> {
+        let mut indices_set: HashSet<u32> = HashSet::new();
+        for &qubit in indices.iter() {
+            if qubit > self.num_qubits() {
+                return Err(CoherenceError::BadDeleteIndex { index: qubit, num_qubits: self.num_qubits() });
+            }
+            indices_set.insert(qubit);
+        }
+
+        let mut old_to_new_indices: HashMap<u32, u32> = HashMap::new();
+        for &index in self.indices().iter() {
+            if !indices_set.contains(&index) {
+                let new_index = index - indices_set.iter().filter(|&&x| x < index).count() as u32;
+                old_to_new_indices.insert(index, new_index);
+            }
+        }
+
+        let new_num_qubits = self.num_qubits() - indices_set.len() as u32;
+
+        let capacity = self.paulis().len();
+        let mut new_paulis: Vec<Pauli> = Vec::with_capacity(capacity);
+        let mut new_indices: Vec<u32> = Vec::with_capacity(capacity);
+        let mut new_boundaries: Vec<usize> = Vec::with_capacity(capacity);
+        new_boundaries.push(0);
+
+        let mut skipped_terms = 0;
+        let mut boundary_el = 1;
+        for (i, (&pauli, &index)) in self.paulis().iter().zip(self.indices().iter()).enumerate() {
+            if self.boundaries()[boundary_el] <= i {
+                new_boundaries.push(self.boundaries()[boundary_el] - skipped_terms);
+                boundary_el += 1;
+            }
+
+            if !indices_set.contains(&index) {
+                new_indices.push(old_to_new_indices[&index]);
+                new_paulis.push(pauli);
+            } else {
+                skipped_terms += 1;
+            }
+        }
+        new_boundaries.push(self.boundaries()[boundary_el] - skipped_terms);
+
+        Self::new_from_raw_parts(
+            new_num_qubits,
+            self.rates().to_vec(),
+            new_paulis,
+            new_indices,
+            new_boundaries,
+        )
     }
 }
 
@@ -1227,6 +1281,12 @@ impl PyPauliLindbladMap {
             })
         }?;
         Ok(inner.into())
+    }
+
+    #[pyo3(signature = (/, indices))]
+    pub fn drop_paulis(&self, indices: Vec<u32>) -> PyResult<Self> {
+        let inner = self.inner.read().map_err(|_| InnerReadError)?;
+        Ok(inner.drop_paulis(indices)?.into())
     }
 
     /// Get a copy of this Pauli Lindblad map.

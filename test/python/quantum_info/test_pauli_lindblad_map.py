@@ -1045,6 +1045,30 @@ class TestPauliLindbladMap(QiskitTestCase):
         )
         self.assertEqual(pauli_lindblad_map, reconstructed)
 
+    def test_drop_paulis(self):
+        """Test the `drop_paulis` method."""
+        pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+        self.assertEqual(pauli_map_in, pauli_map_in.drop_paulis([]))
+
+        pauli_map_out = pauli_map_in.drop_paulis([0])
+        expected = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+        
+        pauli_map_out = pauli_map_in.drop_paulis([0, 3])
+        expected = PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+        
+        pauli_map_out = pauli_map_in.drop_paulis([0, 4])
+        expected = PauliLindbladMap.from_list([("IXIZI", 2.0), ("IIIYI", 0.5), ("IIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+
+
+    def test_drop_paulis_raises(self):
+        """Test that `drop_paulis` raises."""
+        pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+        with self.assertRaisesRegex(ValueError, "cannot delete qubit 8 from 5-qubits PauliLindbladMap"):
+            pauli_map_in.drop_paulis([0, 8])
+
 
 def canonicalize_term(pauli, indices, rate):
     # canonicalize a sparse list term by sorting by indices (which is unique as

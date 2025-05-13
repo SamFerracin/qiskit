@@ -10,8 +10,7 @@
 // copyright notice, and modified files need to carry a notice indicating
 // that they have been altered from the originals.
 
-use hashbrown::{HashMap, HashSet};
-use std::collections::btree_map;
+use hashbrown::HashSet;
 
 use numpy::{PyArray1, PyArrayLike1, PyArrayMethods};
 use pyo3::{
@@ -289,50 +288,52 @@ impl PauliLindbladMap {
         }
     }
 
+    /// Drop Paulis out of this Pauli Lindblad map.
+    ///
+    /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
+    ///
+    /// Args:
+    ///     indices (Sequence[int]): The indices for which Paulis must be dropped.
+    /// 
+    /// Returns:
+    ///     A new Pauli Lindblad map where every Pauli on the given `indices` has been dropped.
     pub fn drop_paulis(&self, indices: Vec<u32>) -> Result<Self, CoherenceError> {
         let mut indices_set: HashSet<u32> = HashSet::new();
         for &qubit in indices.iter() {
             if qubit > self.num_qubits() {
-                return Err(CoherenceError::BadDeleteIndex { index: qubit, num_qubits: self.num_qubits() });
+                return Err(CoherenceError::BadDropIndex {
+                    index: qubit,
+                    num_qubits: self.num_qubits(),
+                });
             }
             indices_set.insert(qubit);
         }
 
-        let mut old_to_new_indices: HashMap<u32, u32> = HashMap::new();
-        for &index in self.indices().iter() {
-            if !indices_set.contains(&index) {
-                let new_index = index - indices_set.iter().filter(|&&x| x < index).count() as u32;
-                old_to_new_indices.insert(index, new_index);
-            }
-        }
+        let mut new_paulis: Vec<Pauli> = Vec::with_capacity(self.paulis().len());
+        let mut new_indices: Vec<u32> = Vec::with_capacity(self.indices().len());
+        let mut new_boundaries: Vec<usize> = Vec::with_capacity(self.boundaries().len());
 
-        let new_num_qubits = self.num_qubits() - indices_set.len() as u32;
-
-        let capacity = self.paulis().len();
-        let mut new_paulis: Vec<Pauli> = Vec::with_capacity(capacity);
-        let mut new_indices: Vec<u32> = Vec::with_capacity(capacity);
-        let mut new_boundaries: Vec<usize> = Vec::with_capacity(capacity);
         new_boundaries.push(0);
+        let mut boundary_idx = 1;
 
-        let mut skipped_terms = 0;
-        let mut boundary_el = 1;
+        let mut num_dropped_paulis = 0;
         for (i, (&pauli, &index)) in self.paulis().iter().zip(self.indices().iter()).enumerate() {
-            if self.boundaries()[boundary_el] <= i {
-                new_boundaries.push(self.boundaries()[boundary_el] - skipped_terms);
-                boundary_el += 1;
+            if self.boundaries()[boundary_idx] <= i {
+                new_boundaries.push(self.boundaries()[boundary_idx] - num_dropped_paulis);
+                boundary_idx += 1;
             }
 
             if !indices_set.contains(&index) {
-                new_indices.push(old_to_new_indices[&index]);
+                new_indices.push(index);
                 new_paulis.push(pauli);
             } else {
-                skipped_terms += 1;
+                num_dropped_paulis += 1;
             }
         }
-        new_boundaries.push(self.boundaries()[boundary_el] - skipped_terms);
+        new_boundaries.push(self.boundaries()[boundary_idx] - num_dropped_paulis);
 
         Self::new_from_raw_parts(
-            new_num_qubits,
+            self.num_qubits(),
             self.rates().to_vec(),
             new_paulis,
             new_indices,
@@ -1283,6 +1284,23 @@ impl PyPauliLindbladMap {
         Ok(inner.into())
     }
 
+    /// Drop Paulis out of this Pauli Lindblad map.
+    ///
+    /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
+    ///
+    /// Args:
+    ///     indices (Sequence[int]): The indices for which Paulis must be dropped.
+    /// 
+    /// Returns:
+    ///     A new Pauli Lindblad map where every Pauli on the given `indices` has been dropped.
+    ///
+    /// Examples:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         >>> pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+    ///         >>> pauli_map_out = pauli_map_in.drop_paulis([0, 3])
+    ///         >>> assert pauli_lindblad_map.drop_paulis([0, 3]) == PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
     #[pyo3(signature = (/, indices))]
     pub fn drop_paulis(&self, indices: Vec<u32>) -> PyResult<Self> {
         let inner = self.inner.read().map_err(|_| InnerReadError)?;

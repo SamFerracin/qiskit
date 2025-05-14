@@ -1062,12 +1062,34 @@ class TestPauliLindbladMap(QiskitTestCase):
         expected = PauliLindbladMap.from_list([("IXIZI", 2.0), ("IIIYI", 0.5), ("IIIXI", -0.25)])
         self.assertEqual(pauli_map_out, expected)
 
-
     def test_drop_paulis_raises(self):
         """Test that `drop_paulis` raises."""
         pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
-        with self.assertRaisesRegex(ValueError, "cannot delete qubit 8 from 5-qubits PauliLindbladMap"):
+        with self.assertRaisesRegex(ValueError, "cannot drop Paulis for index 8 in a 5-qubit PauliLindbladMap"):
             pauli_map_in.drop_paulis([0, 8])
+
+    def test_keep_paulis(self):
+        """Test the `keep_paulis` method."""
+        pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+        self.assertEqual(pauli_map_in, pauli_map_in.keep_paulis(range(5)))
+
+        pauli_map_out = pauli_map_in.keep_paulis(range(1, 5))
+        expected = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+        
+        pauli_map_out = pauli_map_in.keep_paulis([4, 1, 2])
+        expected = PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+        
+        pauli_map_out = pauli_map_in.keep_paulis([1, 2, 3])
+        expected = PauliLindbladMap.from_list([("IXIZI", 2.0), ("IIIYI", 0.5), ("IIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+
+    def test_keep_paulis_raises(self):
+        """Test that `keep_paulis` raises."""
+        pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+        with self.assertRaisesRegex(ValueError, "cannot keep Paulis for index 8 in a 5-qubit PauliLindbladMap"):
+            pauli_map_in.keep_paulis([0, 8])
 
 
 def canonicalize_term(pauli, indices, rate):

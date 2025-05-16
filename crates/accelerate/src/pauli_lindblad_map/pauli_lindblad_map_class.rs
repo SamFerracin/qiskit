@@ -1118,6 +1118,84 @@ impl PyPauliLindbladMap {
         Ok(out.unbind())
     }
 
+
+    /// Drop Paulis out of this Pauli Lindblad map.
+    ///
+    /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
+    ///
+    /// Args:
+    ///     indices (Sequence[int]): The indices for which Paulis must be dropped.
+    ///
+    /// Returns:
+    ///     A new Pauli Lindblad map where every Pauli on the given `indices` has been dropped.
+    ///
+    /// Examples:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         >>> pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+    ///         >>> pauli_map_out = pauli_map_in.keep_paulis([1, 2, 4])
+    ///         >>> assert pauli_map_out == PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
+    #[pyo3(signature = (/, indices))]
+    pub fn drop_paulis(&self, indices: Vec<u32>) -> PyResult<Self> {
+        let inner = self.inner.read().map_err(|_| InnerReadError)?;
+
+        let max_index = match indices.iter().max() {
+            Some(&index) => index,
+            None => 0,
+        };
+        if max_index >= inner.num_qubits() {
+            let num_qubits = inner.num_qubits();
+            return Err(PyValueError::new_err(format!(
+                "cannot drop Paulis for index {max_index} in a {num_qubits}-qubit PauliLindbladMap"
+            )));
+        }
+        
+        Ok(inner.drop_paulis(indices.into_iter().collect())?.into())
+    }
+
+    /// Keep every Pauli on the given `indices` and drop all others.
+    ///
+    /// This is equivalent to using :meth:`PauliLindbladMap.drop_paulis` on the complement set of indices.
+    ///
+    /// Args:
+    ///     indices (Sequence[int]): The indices for which Paulis must be kept.
+    ///
+    /// Returns:
+    ///     A new Pauli Lindblad map where every Pauli on the given `indices` has been kept and all other
+    ///     Paulis have been dropped.
+    ///
+    /// Examples:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         >>> pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
+    ///         >>> pauli_map_out = pauli_map_in.keep_paulis([1, 2, 4])
+    ///         >>> assert pauli_map_out == PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
+    #[pyo3(signature = (/, indices))]
+    pub fn keep_paulis(&self, indices: Vec<u32>) -> PyResult<Self> {
+        let inner = self.inner.read().map_err(|_| InnerReadError)?;
+
+        let max_index = match indices.iter().max() {
+            Some(&index) => index,
+            None => 0,
+        };
+        if max_index >= inner.num_qubits() {
+            let num_qubits = inner.num_qubits();
+            return Err(PyValueError::new_err(format!(
+                "cannot keep Paulis for index {max_index} in a {num_qubits}-qubit PauliLindbladMap"
+            )));
+        }
+
+        Ok(inner
+            .drop_paulis(
+                (0..self.num_qubits()?)
+                    .filter(|index| !indices.contains(&index))
+                    .collect(),
+            )?
+            .into())
+    }
+
     fn __len__(&self) -> PyResult<usize> {
         self.num_terms()
     }

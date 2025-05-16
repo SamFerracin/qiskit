@@ -285,13 +285,13 @@ impl PauliLindbladMap {
         let mut new_boundaries: Vec<usize> = Vec::with_capacity(self.boundaries().len());
 
         new_boundaries.push(0);
-        let mut boundary_idx = 1;
+        let mut boundaries_idx = 1;
 
         let mut num_dropped_paulis = 0;
         for (i, (&pauli, &index)) in self.paulis().iter().zip(self.indices().iter()).enumerate() {
-            if self.boundaries()[boundary_idx] <= i {
-                new_boundaries.push(self.boundaries()[boundary_idx] - num_dropped_paulis);
-                boundary_idx += 1;
+            if self.boundaries()[boundaries_idx] == i {
+                new_boundaries.push(self.boundaries()[boundaries_idx] - num_dropped_paulis);
+                boundaries_idx += 1;
             }
 
             if !indices.contains(&index) {
@@ -301,7 +301,7 @@ impl PauliLindbladMap {
                 num_dropped_paulis += 1;
             }
         }
-        new_boundaries.push(self.boundaries()[boundary_idx] - num_dropped_paulis);
+        new_boundaries.push(self.boundaries()[boundaries_idx] - num_dropped_paulis);
 
         Self::new_from_raw_parts(
             self.num_qubits(),

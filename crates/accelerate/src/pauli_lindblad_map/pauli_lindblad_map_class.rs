@@ -286,22 +286,25 @@ impl PauliLindbladMap {
 
         new_boundaries.push(0);
         let mut boundaries_idx = 1;
+        let mut current_boundary = self.boundaries()[boundaries_idx];
 
         let mut num_dropped_paulis = 0;
         for (i, (&pauli, &index)) in self.paulis().iter().zip(self.indices().iter()).enumerate() {
-            if self.boundaries()[boundaries_idx] == i {
-                new_boundaries.push(self.boundaries()[boundaries_idx] - num_dropped_paulis);
+            if current_boundary == i {
+                new_boundaries.push(current_boundary - num_dropped_paulis);
+
                 boundaries_idx += 1;
+                current_boundary = self.boundaries()[boundaries_idx]
             }
 
-            if !indices.contains(&index) {
+            if indices.contains(&index) {
+                num_dropped_paulis += 1;
+            } else {
                 new_indices.push(index);
                 new_paulis.push(pauli);
-            } else {
-                num_dropped_paulis += 1;
             }
         }
-        new_boundaries.push(self.boundaries()[boundaries_idx] - num_dropped_paulis);
+        new_boundaries.push(current_boundary - num_dropped_paulis);
 
         Self::new_from_raw_parts(
             self.num_qubits(),

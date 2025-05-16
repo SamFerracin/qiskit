@@ -18,6 +18,7 @@ use pyo3::{
     types::{PyList, PyString, PyTuple, PyType},
     IntoPyObjectExt, PyErr,
 };
+use hashbrown::HashSet;
 use std::sync::{Arc, RwLock};
 
 use qiskit_circuit::slice::{PySequenceIndex, SequenceIndex};
@@ -273,6 +274,44 @@ impl PauliLindbladMap {
             rate: self.rates[index],
             qubit_sparse_pauli: self.qubit_sparse_pauli_list.term(index),
         }
+    }
+
+
+
+    /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
+    /// 
+    /// It ignores all the indices that are larger than `self.num_qubits`.
+    pub fn drop_paulis(&self, indices: HashSet<u32>) -> Result<Self, CoherenceError> {
+        let mut new_paulis: Vec<Pauli> = Vec::with_capacity(self.paulis().len());
+        let mut new_indices: Vec<u32> = Vec::with_capacity(self.indices().len());
+        let mut new_boundaries: Vec<usize> = Vec::with_capacity(self.boundaries().len());
+
+        new_boundaries.push(0);
+        let mut boundary_idx = 1;
+
+        let mut num_dropped_paulis = 0;
+        for (i, (&pauli, &index)) in self.paulis().iter().zip(self.indices().iter()).enumerate() {
+            if self.boundaries()[boundary_idx] <= i {
+                new_boundaries.push(self.boundaries()[boundary_idx] - num_dropped_paulis);
+                boundary_idx += 1;
+            }
+
+            if !indices.contains(&index) {
+                new_indices.push(index);
+                new_paulis.push(pauli);
+            } else {
+                num_dropped_paulis += 1;
+            }
+        }
+        new_boundaries.push(self.boundaries()[boundary_idx] - num_dropped_paulis);
+
+        Self::new_from_raw_parts(
+            self.num_qubits(),
+            self.rates().to_vec(),
+            new_paulis,
+            new_indices,
+            new_boundaries,
+        )
     }
 }
 

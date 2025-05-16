@@ -10,6 +10,7 @@
 // copyright notice, and modified files need to carry a notice indicating
 // that they have been altered from the originals.
 
+use hashbrown::HashSet;
 use numpy::{PyArray1, PyArrayMethods};
 use pyo3::{
     exceptions::{PyTypeError, PyValueError},
@@ -18,7 +19,6 @@ use pyo3::{
     types::{PyList, PyString, PyTuple, PyType},
     IntoPyObjectExt, PyErr,
 };
-use hashbrown::HashSet;
 use std::sync::{Arc, RwLock};
 
 use qiskit_circuit::slice::{PySequenceIndex, SequenceIndex};
@@ -276,10 +276,8 @@ impl PauliLindbladMap {
         }
     }
 
-
-
     /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
-    /// 
+    ///
     /// It ignores all the indices that are larger than `self.num_qubits`.
     pub fn drop_paulis(&self, indices: HashSet<u32>) -> Result<Self, CoherenceError> {
         let mut new_paulis: Vec<Pauli> = Vec::with_capacity(self.paulis().len());
@@ -1118,7 +1116,6 @@ impl PyPauliLindbladMap {
         Ok(out.unbind())
     }
 
-
     /// Drop Paulis out of this Pauli Lindblad map.
     ///
     /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
@@ -1150,7 +1147,7 @@ impl PyPauliLindbladMap {
                 "cannot drop Paulis for index {max_index} in a {num_qubits}-qubit PauliLindbladMap"
             )));
         }
-        
+
         Ok(inner.drop_paulis(indices.into_iter().collect())?.into())
     }
 

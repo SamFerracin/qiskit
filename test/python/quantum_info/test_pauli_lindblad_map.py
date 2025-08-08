@@ -878,12 +878,28 @@ class TestPauliLindbladMap(QiskitTestCase):
         expected = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
         self.assertEqual(pauli_map_out, expected)
 
+        pauli_map_out = pauli_map_in.drop_paulis([0], remove=True)
+        expected = PauliLindbladMap.from_list([("XXIZ", 2.0), ("IIIY", 0.5), ("ZIIX", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+
         pauli_map_out = pauli_map_in.drop_paulis([0, 3])
         expected = PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
         self.assertEqual(pauli_map_out, expected)
 
+        pauli_map_out = pauli_map_in.drop_paulis([0, 3], remove=True)
+        expected = PauliLindbladMap.from_list([("XIZ", 2.0), ("IIY", 0.5), ("ZIX", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+
         pauli_map_out = pauli_map_in.drop_paulis([0, 4])
         expected = PauliLindbladMap.from_list([("IXIZI", 2.0), ("IIIYI", 0.5), ("IIIXI", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+
+        pauli_map_out = pauli_map_in.drop_paulis([0, 4], remove=True)
+        expected = PauliLindbladMap.from_list([("XIZ", 2.0), ("IIY", 0.5), ("IIX", -0.25)])
+        self.assertEqual(pauli_map_out, expected)
+
+        pauli_map_out = pauli_map_in.drop_paulis([0, 1, 2, 3, 4])
+        expected = PauliLindbladMap.from_list([("IIIII", 2.0), ("IIIII", 0.5), ("IIIII", -0.25)])
         self.assertEqual(pauli_map_out, expected)
 
     def test_drop_paulis_raises(self):
@@ -901,6 +917,11 @@ class TestPauliLindbladMap(QiskitTestCase):
             ValueError, "cannot drop Paulis for index 8 in a 5-qubit PauliLindbladMap"
         ):
             pauli_map_in.drop_paulis([0, 8])
+
+        with self.assertRaisesRegex(
+            ValueError, "cannot remove every"
+        ):
+            pauli_map_in.drop_paulis([0, 1, 2, 3, 4], remove=True)
 
     def test_keep_paulis(self):
         """Test the `keep_paulis` method."""

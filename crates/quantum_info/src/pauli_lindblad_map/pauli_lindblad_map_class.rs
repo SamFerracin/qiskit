@@ -295,7 +295,12 @@ impl PauliLindbladMap {
     /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
     ///
     /// It ignores all the indices that are larger than `self.num_qubits`.
-    pub fn drop_paulis(&self, indices: HashSet<u32>) -> Result<Self, CoherenceError> {
+    pub fn drop_paulis(&self, indices: HashSet<u32>, remove: bool) -> Result<Self, CoherenceError> {
+        let num_dropped_qubits = match remove {
+            true => {indices.len() as u32},
+            false => {0},
+        };
+
         let mut new_paulis: Vec<Pauli> = Vec::with_capacity(self.paulis().len());
         let mut new_indices: Vec<u32> = Vec::with_capacity(self.indices().len());
         let mut new_boundaries: Vec<usize> = Vec::with_capacity(self.boundaries().len());
@@ -310,13 +315,17 @@ impl PauliLindbladMap {
                 new_boundaries.push(current_boundary - num_dropped_paulis);
 
                 boundaries_idx += 1;
-                current_boundary = self.boundaries()[boundaries_idx]
+                current_boundary = self.boundaries()[boundaries_idx];
             }
 
             if indices.contains(&index) {
                 num_dropped_paulis += 1;
             } else {
-                new_indices.push(index);
+                let new_index = match remove {
+                    true => {index - (indices.iter().filter(|&&x| x < index).count() as u32)},
+                    false => {index},
+                };
+                new_indices.push(new_index);
                 new_paulis.push(pauli);
             }
         }
@@ -324,55 +333,10 @@ impl PauliLindbladMap {
 
         Self::new(
             self.rates().to_vec(),
-            QubitSparsePauliList::new(self.num_qubits(), new_paulis, new_indices, new_boundaries)
+            QubitSparsePauliList::new(self.num_qubits() - num_dropped_qubits, new_paulis, new_indices, new_boundaries)
                 .unwrap(),
         )
     }
-
-    /// Marginalize this map according to the given `indices`.
-    /// 
-    /// This function traces out the Pauli terms acting on the given `indices`, and returns the
-    /// the marginalized operator on the remaining indices. It is distinct from 
-    /// :meth:`.PauliLindbladMap.drop_paulis`, which replaces Paulis with identities instead of properly
-    /// marginalizing.
-    ///
-    /// It ignores all the indices that are larger than `self.num_qubits`.
-    pub fn marginalize(&self, indices: HashSet<u32>) -> Result<Self, CoherenceError> {
-        let num_remaining_indices = self.paulis().len() - indices.len();
-
-        let mut new_paulis: Vec<Pauli> = Vec::with_capacity(num_remaining_indices);
-        let mut new_indices: Vec<u32> = Vec::with_capacity(num_remaining_indices);
-        let mut new_boundaries: Vec<usize> = Vec::with_capacity(self.boundaries().len());
-
-        new_boundaries.push(0);
-        let mut boundaries_idx = 1;
-        let mut current_boundary = self.boundaries()[boundaries_idx];
-
-        let mut num_dropped_paulis = 0;
-        for (i, (&pauli, &index)) in self.paulis().iter().zip(self.indices().iter()).enumerate() {
-            if current_boundary == i {
-                new_boundaries.push(current_boundary - num_dropped_paulis);
-
-                boundaries_idx += 1;
-                current_boundary = self.boundaries()[boundaries_idx]
-            }
-
-            if indices.contains(&index) {
-                num_dropped_paulis += 1;
-            } else {
-                new_indices.push(index);
-                new_paulis.push(pauli);
-            }
-        }
-        new_boundaries.push(current_boundary - num_dropped_paulis);
-
-        Self::new(
-            self.rates().to_vec(),
-            QubitSparsePauliList::new(self.num_qubits(), new_paulis, new_indices, new_boundaries)
-                .unwrap(),
-        )
-    }
-
     /// Compute the fidelity of the map for a single pauli
     pub fn pauli_fidelity(
         &self,
@@ -1331,10 +1295,13 @@ impl PyPauliLindbladMap {
 
     /// Drop Paulis out of this Pauli Lindblad map.
     ///
-    /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
+    /// Drop every Pauli on the given `indices`, either replacing them with an identity (default) or
+    /// removing them altogether.
     ///
     /// Args:
     ///     indices (Sequence[int]): The indices for which Paulis must be dropped.
+    ///     remove (bool): Whether to remove the Pauli terms or replace them by the identity. Defaults to
+    ///         ``False``.
     ///
     /// Returns:
     ///     A new Pauli Lindblad map where every Pauli on the given `indices` has been dropped.
@@ -1346,8 +1313,8 @@ impl PyPauliLindbladMap {
     ///         >>> pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
     ///         >>> pauli_map_out = pauli_map_in.keep_paulis([1, 2, 4])
     ///         >>> assert pauli_map_out == PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
-    #[pyo3(signature = (/, indices))]
-    pub fn drop_paulis(&self, indices: Vec<u32>) -> PyResult<Self> {
+    #[pyo3(signature = (/, indices, remove=false))]
+    pub fn drop_paulis(&self, indices: Vec<u32>, remove: bool) -> PyResult<Self> {
         let inner = self.inner.read().map_err(|_| InnerReadError)?;
 
         let max_index = match indices.iter().max() {
@@ -1360,8 +1327,13 @@ impl PyPauliLindbladMap {
                 "cannot drop Paulis for index {max_index} in a {num_qubits}-qubit PauliLindbladMap"
             )));
         }
+        if remove == true && (indices.len() as u32) == inner.num_qubits() {
+            return Err(PyValueError::new_err(format!(
+                "cannot remove every index from a PauliLindbladMap"
+            )));
+        }
 
-        Ok(inner.drop_paulis(indices.into_iter().collect())?.into())
+        Ok(inner.drop_paulis(indices.into_iter().collect(), remove)?.into())
     }
 
     /// Keep every Pauli on the given `indices` and drop all others.
@@ -1370,6 +1342,8 @@ impl PyPauliLindbladMap {
     ///
     /// Args:
     ///     indices (Sequence[int]): The indices for which Paulis must be kept.
+    ///     remove (bool): Whether to remove the Pauli terms or replace them by the identity. Defaults to
+    ///         ``False``.
     ///
     /// Returns:
     ///     A new Pauli Lindblad map where every Pauli on the given `indices` has been kept and all other
@@ -1382,8 +1356,8 @@ impl PyPauliLindbladMap {
     ///         >>> pauli_map_in = PauliLindbladMap.from_list([("XXIZI", 2.0), ("IIIYZ", 0.5), ("ZIIXY", -0.25)])
     ///         >>> pauli_map_out = pauli_map_in.keep_paulis([1, 2, 4])
     ///         >>> assert pauli_map_out == PauliLindbladMap.from_list([("XIIZI", 2.0), ("IIIYI", 0.5), ("ZIIXI", -0.25)])
-    #[pyo3(signature = (/, indices))]
-    pub fn keep_paulis(&self, indices: Vec<u32>) -> PyResult<Self> {
+    #[pyo3(signature = (/, indices, remove=false))]
+    pub fn keep_paulis(&self, indices: Vec<u32>, remove: bool) -> PyResult<Self> {
         let inner = self.inner.read().map_err(|_| InnerReadError)?;
 
         let max_index = match indices.iter().max() {
@@ -1402,6 +1376,7 @@ impl PyPauliLindbladMap {
                 (0..self.num_qubits()?)
                     .filter(|index| !indices.contains(index))
                     .collect(),
+                remove,
             )?
             .into())
     }

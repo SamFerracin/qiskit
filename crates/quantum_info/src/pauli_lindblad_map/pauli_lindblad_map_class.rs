@@ -292,7 +292,8 @@ impl PauliLindbladMap {
         Ok(PauliLindbladMap::new(rates, qubit_sparse_pauli_list).unwrap())
     }
 
-    /// Drop every Pauli on the given `indices`, effectively replacing them with an identity.
+    /// Drop every Pauli on the given `indices`, replacing them with an identity (if `remove` is `false`)
+    /// or removing them.
     ///
     /// It ignores all the indices that are larger than `self.num_qubits`.
     pub fn drop_paulis(&self, indices: HashSet<u32>, remove: bool) -> Result<Self, CoherenceError> {

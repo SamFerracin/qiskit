@@ -62,6 +62,9 @@ class DrawElement:
     def __init__(self, label=None):
         self._width = None
         self.label = self.mid_content = label
+        self.top_content = ""
+        self.mid_content = ""
+        self.bot_content = ""
         self.top_format = self.mid_format = self.bot_format = "%s"
         self.top_connect = self.bot_connect = " "
         self.top_pad = self._mid_padding = self.bot_pad = " "
@@ -74,12 +77,13 @@ class DrawElement:
     @property
     def top(self):
         """Constructs the top line of the element"""
-        if (self.width % 2) == 0 and len(self.top_format) % 2 == 1 and len(self.top_connect) == 1:
-            ret = self.top_format % (self.top_pad + self.top_connect).center(
+        top_content = self.top_content if self.top_content else self.top_connect
+        if (self.width % 2) == 0 and len(self.top_format) % 2 == 1 and len(top_content) == 1:
+            ret = self.top_format % (self.top_pad + top_content).center(
                 self.width, self.top_pad
             )
         else:
-            ret = self.top_format % self.top_connect.center(self.width, self.top_pad)
+            ret = self.top_format % top_content.center(self.width, self.top_pad)
         if self.right_fill:
             ret = ret.ljust(self.right_fill, self.top_pad)
         if self.left_fill:
@@ -101,12 +105,13 @@ class DrawElement:
     @property
     def bot(self):
         """Constructs the bottom line of the element"""
+        bot_content = self.bot_content if self.bot_content else self.bot_connect
         if (self.width % 2) == 0 and len(self.top_format) % 2 == 1:
-            ret = self.bot_format % (self.bot_pad + self.bot_connect).center(
+            ret = self.bot_format % (self.bot_pad + bot_content).center(
                 self.width, self.bot_pad
             )
         else:
-            ret = self.bot_format % self.bot_connect.center(self.width, self.bot_pad)
+            ret = self.bot_format % bot_content.center(self.width, self.bot_pad)
         if self.right_fill:
             ret = ret.ljust(self.right_fill, self.bot_pad)
         if self.left_fill:
@@ -124,7 +129,7 @@ class DrawElement:
         """Returns the width of the label, including padding"""
         if self._width:
             return self._width
-        return len(self.mid_content)
+        return max(len(self.mid_content), len(self.top_content))
 
     @width.setter
     def width(self, value):
@@ -329,7 +334,7 @@ class BoxOnQuWireBot(MultiBox, BoxOnQuWire):
 class FlowOnQuWire(DrawElement):
     """Draws a box for a ControlFlowOp using a single qubit."""
 
-    def __init__(self, section, label="", top_connect="─", conditional=False):
+    def __init__(self, section, label="", top_connect="─", conditional=False, top_content=""):
         super().__init__(label)
         if section == CF_RIGHT:
             self.top_format = " ─%s─┐"
@@ -341,6 +346,7 @@ class FlowOnQuWire(DrawElement):
             self.bot_format = "└─%s─ "
         self.top_pad = self.bot_pad = self.mid_bck = "─"
         self.top_connect = top_connect
+        self.top_content = top_content
         self.bot_connect = "╥" if conditional else "─"
         self.mid_content = label
         self.top_connector = {"│": "┴"}
@@ -1416,6 +1422,7 @@ class TextDrawing:
 
         op = node.op
         depth = str(self._nest_depth)
+        top_content = ""
         if section == CF_LEFT:
             etext = ""
             if self._expr_text:
@@ -1435,6 +1442,7 @@ class TextDrawing:
                 label = "For-" + depth + " " + index_str
             elif isinstance(op, BoxOp):
                 label = "Box-" + depth + etext
+                top_content = ",".join([annot.__class__.__name__ for annot in op.annotations])
             elif isinstance(op, SwitchCaseOp):
                 label = "Switch-" + depth + etext
             else:
@@ -1467,7 +1475,7 @@ class TextDrawing:
         if len(node.qargs) == 1:
             flow_layer.set_qubit(
                 self.qubits[flow_wire_map[node.qargs[0]]],
-                FlowOnQuWire(section, label=label, conditional=conditional),
+                FlowOnQuWire(section, label=label, conditional=conditional, top_content=top_content),
             )
         else:
             # If multiple qubits, must use wire_map to handle wire_order changes.
@@ -1476,20 +1484,19 @@ class TextDrawing:
             max_idx = max(idx_list)
             box_height = max_idx - min_idx + 1
 
-            flow_layer.set_qubit(
-                self.qubits[min_idx], FlowOnQuWireTop(section, label=label, wire_label="")
-            )
+            wire_top = FlowOnQuWireTop(section, label=label, wire_label="")
+            wire_top.top_content = top_content
+            flow_layer.set_qubit(self.qubits[min_idx], wire_top)
             for order, i in enumerate(range(min_idx + 1, max_idx)):
-                flow_layer.set_qubit(
-                    self.qubits[i],
-                    FlowOnQuWireMid(
-                        section,
-                        label=label,
-                        input_length=box_height,
-                        order=order,
-                        wire_label="",
-                    ),
+                wire_mid = FlowOnQuWireMid(
+                    section,
+                    label=label,
+                    input_length=box_height,
+                    order=order,
+                    wire_label="",
                 )
+                wire_mid.bot_content = " " * len(top_content)
+                flow_layer.set_qubit(self.qubits[i], wire_mid)
             flow_layer.set_qubit(
                 self.qubits[max_idx],
                 FlowOnQuWireBot(
